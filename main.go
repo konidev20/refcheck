@@ -19,9 +19,11 @@ import (
 type Result struct {
 	FolderPath        string          `json:"folder_path"`
 	TotalFiles        int             `json:"total_files"`
-	IntactFiles       int             `json:"intact_files"`
-	CorruptedFiles    int             `json:"corrupted_files"`
+	IntactFiles       int             `json:"intact_files,omitempty"`
+	CorruptedFiles    int             `json:"corrupted_files,omitempty"`
 	CorruptedFileList []CorruptedFile `json:"corrupted_file_list,omitempty"`
+	InvalidFiles      int             `json:"invalid_files,omitempty"`
+	InvalidFileList   []string        `json:"invalid_file_list,omitempty"`
 }
 
 type CorruptedFile struct {
@@ -53,7 +55,7 @@ The tool can be used to check the integrity of files in a directory before deplo
 	}
 
 	rootCmd.Flags().StringVarP(&refCheckOptions.Path, "path", "p", ".", "Path to the folder")
-	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Exclude, "exclude", "e", []string{"config", ".DS_Store"}, "Regular expression pattern for excluding files and folders")
+	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Exclude, "exclude", "e", []string{"config"}, "Regular expression pattern for excluding files and folders")
 	rootCmd.Flags().IntVarP(&refCheckOptions.Workers, "workers", "w", 4, "Number of workers for parallel processing")
 	rootCmd.Flags().BoolVarP(&refCheckOptions.JSON, "json", "j", false, "Print the results in JSON format")
 
@@ -114,6 +116,7 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 		tbl.AddRow("Total Files", result.TotalFiles)
 		tbl.AddRow("Intact Files", result.IntactFiles)
 		tbl.AddRow("Corrupted Files", result.CorruptedFiles)
+		tbl.AddRow("Invalid Files", result.InvalidFiles)
 		tbl.Print()
 
 		if result.CorruptedFiles > 0 {
@@ -127,10 +130,31 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 			}
 			tbl.Print()
 		}
+
+		if result.InvalidFiles > 0 {
+			fmt.Println("\nInvalid File Names:")
+			tbl := table.New("File Path")
+			tbl.WithWriter(cmd.OutOrStdout())
+			tbl.WithHeaderSeparatorRow('-')
+			tbl.WithPadding(2)
+			for _, file := range result.InvalidFileList {
+				tbl.AddRow(file)
+			}
+			tbl.Print()
+		}
 	}
 }
 
+// processFile checks if the file is valid and calculates the SHA256 hash of the file
 func processFile(filePath string, result *Result) {
+	expectedHash := filepath.Base(filePath)
+	result.TotalFiles++
+	if !isValidSha256(expectedHash) {
+		result.InvalidFiles++
+		result.InvalidFileList = append(result.InvalidFileList, filePath)
+		return
+	}
+
 	file, err := os.Open(filePath)
 	if err != nil {
 		fmt.Printf("Error opening file %s: %v\n", filePath, err)
@@ -144,9 +168,6 @@ func processFile(filePath string, result *Result) {
 		return
 	}
 
-	result.TotalFiles++
-
-	expectedHash := filepath.Base(filePath)
 	actualHash := hex.EncodeToString(hash.Sum(nil))
 
 	if expectedHash == actualHash {
@@ -155,4 +176,17 @@ func processFile(filePath string, result *Result) {
 		result.CorruptedFiles++
 		result.CorruptedFileList = append(result.CorruptedFileList, CorruptedFile{FilePath: filePath, ExpectedHash: expectedHash, ActualHash: actualHash})
 	}
+}
+
+func isValidSha256(hash string) bool {
+	// Check if the hash is 64 characters long
+	if len(hash) != 64 {
+		return false
+	}
+
+	// Check if the hash contains only hexadecimal digits
+	if !regexp.MustCompile(`^[a-f0-9]+$`).MatchString(hash) {
+		return false
+	}
+	return true
 }
