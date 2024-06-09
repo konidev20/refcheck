@@ -39,7 +39,7 @@ func processFile(filePath string, result *Result) {
 		result.IntactFiles++
 	} else {
 		result.CorruptedFiles++
-		result.CorruptedFileList = append(result.CorruptedFileList, CorruptedFile{FilePath: filePath, ExpectedHash: expectedHash, ActualHash: actualHash})
+		result.CorruptedFileList = append(result.CorruptedFileList, CorruptedFile{FilePath: filePath, ActualHash: actualHash})
 	}
 }
 

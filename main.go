@@ -18,17 +18,16 @@ import (
 type Result struct {
 	FolderPath        string          `json:"folder_path"`
 	TotalFiles        int             `json:"total_files"`
-	IntactFiles       int             `json:"intact_files,omitempty"`
-	CorruptedFiles    int             `json:"corrupted_files,omitempty"`
-	CorruptedFileList []CorruptedFile `json:"corrupted_file_list,omitempty"`
-	InvalidFiles      int             `json:"invalid_files,omitempty"`
-	InvalidFileList   []string        `json:"invalid_file_list,omitempty"`
+	IntactFiles       int             `json:"intact_files"`
+	CorruptedFiles    int             `json:"corrupted_files"`
+	CorruptedFileList []CorruptedFile `json:"corrupted_file_list"`
+	InvalidFiles      int             `json:"invalid_files"`
+	InvalidFileList   []string        `json:"invalid_file_list"`
 }
 
 type CorruptedFile struct {
-	FilePath     string `json:"file_path"`
-	ExpectedHash string `json:"expected_hash"`
-	ActualHash   string `json:"actual_hash"`
+	FilePath   string `json:"file_path"`
+	ActualHash string `json:"actual_hash"`
 }
 
 type RefCheckOptions struct {
@@ -146,7 +145,7 @@ func printResult(results []*Result, jsonOutput bool, w io.Writer) {
 			fmt.Println("")
 			fmt.Println("-------------------")
 			fmt.Println("Folder Path:", result.FolderPath)
-
+			fmt.Println("")
 			tbl := table.New("Result", "Value")
 			tbl.WithHeaderSeparatorRow('-')
 			tbl.WithPadding(10)
@@ -157,30 +156,35 @@ func printResult(results []*Result, jsonOutput bool, w io.Writer) {
 			tbl.AddRow("Corrupted Files", result.CorruptedFiles)
 			tbl.AddRow("Invalid Files", result.InvalidFiles)
 			tbl.Print()
-
-			if result.CorruptedFiles > 0 {
-				fmt.Println("\nCorrupted Files:")
-				tbl := table.New("File Path", "Expected Hash", "Actual Hash")
+			fmt.Println("")
+			fmt.Println("\nCorrupted Files:")
+			if len(result.CorruptedFileList) > 0 {
+				tbl = table.New("File Path", "Actual Hash")
 				tbl.WithWriter(w)
 				tbl.WithHeaderSeparatorRow('_')
 				tbl.WithPadding(10)
 				for _, file := range result.CorruptedFileList {
-					tbl.AddRow(file.FilePath, file.ExpectedHash, file.ActualHash)
+					tbl.AddRow(file.FilePath, file.ActualHash)
 				}
-				tbl.Print()
+			} else {
+				fmt.Println("None")
 			}
-
-			if result.InvalidFiles > 0 {
-				fmt.Println("\nInvalid File Names:")
-				tbl := table.New("File Path")
+			fmt.Println("")
+			fmt.Println("\nInvalid File Names:")
+			if len(result.InvalidFileList) > 0 {
+				tbl = table.New("File Path")
 				tbl.WithWriter(w)
 				tbl.WithHeaderSeparatorRow('-')
 				tbl.WithPadding(10)
 				for _, file := range result.InvalidFileList {
 					tbl.AddRow(file)
 				}
+
 				tbl.Print()
+			} else {
+				fmt.Println("None")
 			}
+			fmt.Println("")
 			fmt.Println("-------------------")
 			fmt.Println("")
 		}
