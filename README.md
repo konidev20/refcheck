@@ -84,3 +84,13 @@ Output:
 }
 ```
 
+## Templates
+You can use templates to do refcheck for specific repsotitories. Currently, templates use exclusion
+lists which are common to a specific repository format. For example, in restic repositories all files
+except the `config` file have a SHA256 hash of the file name.
+
+```
+refcheck -p . -t restic -w 8 -j
+```
+
+The above command will exclude the restic repository specifc exclusion list and check the files.

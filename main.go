@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
 
@@ -33,10 +34,32 @@ type CorruptedFile struct {
 }
 
 type RefCheckOptions struct {
-	Path    string
+	Path     string
+	Exclude  []string
+	Workers  int
+	JSON     bool
+	Template []string
+}
+
+type Template struct {
 	Exclude []string
-	Workers int
-	JSON    bool
+}
+
+var templates map[string]Template
+
+var resticTemplate Template = Template{
+	Exclude: []string{"config"},
+}
+
+var macOSTemplate Template = Template{
+	Exclude: []string{".DS_Store"},
+}
+
+func init() {
+	templates = map[string]Template{
+		"restic": resticTemplate,
+		"darwin": macOSTemplate,
+	}
 }
 
 var refCheckOptions RefCheckOptions
@@ -54,22 +77,35 @@ The tool can be used to check the integrity of files in a directory before deplo
 		},
 	}
 
+	goos := runtime.GOOS
+
 	rootCmd.Flags().StringVarP(&refCheckOptions.Path, "path", "p", ".", "Path to the folder")
-	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Exclude, "exclude", "e", []string{"config"}, "Regular expression pattern for excluding files and folders")
+	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Exclude, "exclude", "e", []string{}, "Regular expression pattern for excluding files and folders. Can be specified multiple times.")
 	rootCmd.Flags().IntVarP(&refCheckOptions.Workers, "workers", "w", 4, "Number of workers for parallel processing")
 	rootCmd.Flags().BoolVarP(&refCheckOptions.JSON, "json", "j", false, "Print the results in JSON format")
+	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Template, "template", "t", []string{"restic", goos}, "Template to use for excluding files and folders. Can be specified multiple times.")
 
 	rootCmd.Execute()
 }
 
+// collectExcludePatterns compiles a regular expression that matches any of the file or folder patterns
+// specified in the RefCheckOptions. This includes both directly specified exclude patterns and those
+// derived from named templates.
+func collectExcludePatterns(opts RefCheckOptions) *regexp.Regexp {
+	excludePatterns := opts.Exclude
+	for _, template := range opts.Template {
+		excludePatterns = append(excludePatterns, templates[template].Exclude...)
+	}
+	combinedPattern := "(" + strings.Join(excludePatterns, ")|(") + ")"
+	return regexp.MustCompile(combinedPattern)
+}
+
 func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 	folderPath := opts.Path
-	excludePatterns := opts.Exclude
 	numWorkers := opts.Workers
 	jsonOutput := opts.JSON
 
-	combinedPattern := "(" + strings.Join(excludePatterns, ")|(") + ")"
-	exclude := regexp.MustCompile(combinedPattern)
+	exclude := collectExcludePatterns(opts)
 	result := &Result{FolderPath: folderPath}
 
 	var wg sync.WaitGroup
