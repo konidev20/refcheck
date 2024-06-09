@@ -32,7 +32,7 @@ type CorruptedFile struct {
 }
 
 type RefCheckOptions struct {
-	Path     string
+	Paths    []string
 	Exclude  []string
 	Workers  int
 	JSON     bool
@@ -56,7 +56,7 @@ The tool can be used to check the integrity of files in a directory before deplo
 
 	goos := runtime.GOOS
 
-	rootCmd.Flags().StringVarP(&refCheckOptions.Path, "path", "p", ".", "Path to the folder")
+	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Paths, "path", "p", []string{"."}, "Path to the folder. Can be specified multiple times.")
 	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Exclude, "exclude", "e", []string{}, "Regular expression pattern for excluding files and folders. Can be specified multiple times.")
 	rootCmd.Flags().IntVarP(&refCheckOptions.Workers, "workers", "w", 4, "Number of workers for parallel processing")
 	rootCmd.Flags().BoolVarP(&refCheckOptions.JSON, "json", "j", false, "Print the results in JSON format")
@@ -78,11 +78,27 @@ func collectExcludePatterns(opts RefCheckOptions) *regexp.Regexp {
 }
 
 func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
-	folderPath := opts.Path
+	folderPaths := opts.Paths
 	numWorkers := opts.Workers
 	jsonOutput := opts.JSON
 
 	exclude := collectExcludePatterns(opts)
+
+	results := make([]*Result, len(folderPaths))
+
+	for idx, folderPath := range folderPaths {
+		result, err := processFolder(folderPath, exclude, numWorkers)
+		if err != nil {
+			fmt.Printf("Error: %v\n", err)
+			return
+		}
+		results[idx] = result
+	}
+
+	printResult(results, jsonOutput, cmd.OutOrStdout())
+}
+
+func processFolder(folderPath string, exclude *regexp.Regexp, numWorkers int) (*Result, error) {
 	result := &Result{FolderPath: folderPath}
 
 	var wg sync.WaitGroup
@@ -115,49 +131,58 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
-		return
+		return nil, err
 	}
 
-	printResult(result, jsonOutput, cmd.OutOrStdout())
+	return result, nil
 }
 
-func printResult(result *Result, jsonOutput bool, w io.Writer) {
+func printResult(results []*Result, jsonOutput bool, w io.Writer) {
 	if jsonOutput {
-		jsonData, _ := json.MarshalIndent(result, "", "  ")
+		jsonData, _ := json.MarshalIndent(results, "", "  ")
 		fmt.Println(string(jsonData))
 	} else {
-		tbl := table.New("Result", "Value")
-		tbl.WithHeaderSeparatorRow('-')
-		tbl.WithPadding(2)
-		tbl.WithWriter(w)
-		tbl.AddRow("Total Files", result.TotalFiles)
-		tbl.AddRow("Intact Files", result.IntactFiles)
-		tbl.AddRow("Corrupted Files", result.CorruptedFiles)
-		tbl.AddRow("Invalid Files", result.InvalidFiles)
-		tbl.Print()
+		for _, result := range results {
+			fmt.Println("")
+			fmt.Println("-------------------")
+			fmt.Println("Folder Path:", result.FolderPath)
 
-		if result.CorruptedFiles > 0 {
-			fmt.Println("\nCorrupted Files:")
-			tbl := table.New("File Path", "Expected Hash", "Actual Hash")
-			tbl.WithWriter(w)
+			tbl := table.New("Result", "Value")
 			tbl.WithHeaderSeparatorRow('-')
-			tbl.WithPadding(2)
-			for _, file := range result.CorruptedFileList {
-				tbl.AddRow(file.FilePath, file.ExpectedHash, file.ActualHash)
-			}
-			tbl.Print()
-		}
+			tbl.WithPadding(10)
+			tbl.WithWriter(w)
 
-		if result.InvalidFiles > 0 {
-			fmt.Println("\nInvalid File Names:")
-			tbl := table.New("File Path")
-			tbl.WithWriter(w)
-			tbl.WithHeaderSeparatorRow('-')
-			tbl.WithPadding(2)
-			for _, file := range result.InvalidFileList {
-				tbl.AddRow(file)
-			}
+			tbl.AddRow("Total Files", result.TotalFiles)
+			tbl.AddRow("Intact Files", result.IntactFiles)
+			tbl.AddRow("Corrupted Files", result.CorruptedFiles)
+			tbl.AddRow("Invalid Files", result.InvalidFiles)
 			tbl.Print()
+
+			if result.CorruptedFiles > 0 {
+				fmt.Println("\nCorrupted Files:")
+				tbl := table.New("File Path", "Expected Hash", "Actual Hash")
+				tbl.WithWriter(w)
+				tbl.WithHeaderSeparatorRow('_')
+				tbl.WithPadding(10)
+				for _, file := range result.CorruptedFileList {
+					tbl.AddRow(file.FilePath, file.ExpectedHash, file.ActualHash)
+				}
+				tbl.Print()
+			}
+
+			if result.InvalidFiles > 0 {
+				fmt.Println("\nInvalid File Names:")
+				tbl := table.New("File Path")
+				tbl.WithWriter(w)
+				tbl.WithHeaderSeparatorRow('-')
+				tbl.WithPadding(10)
+				for _, file := range result.InvalidFileList {
+					tbl.AddRow(file)
+				}
+				tbl.Print()
+			}
+			fmt.Println("-------------------")
+			fmt.Println("")
 		}
 	}
 }
