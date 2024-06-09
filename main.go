@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bufio"
 	"fmt"
+	"os"
 	"regexp"
 	"runtime"
 	"strings"
@@ -13,11 +15,12 @@ import (
 )
 
 type RefCheckOptions struct {
-	Paths    []string
-	Exclude  []string
-	Workers  int
-	JSON     bool
-	Template []string
+	Paths     []string
+	PathsFile []string
+	Exclude   []string
+	Workers   int
+	JSON      bool
+	Template  []string
 }
 
 var refCheckOptions RefCheckOptions
@@ -30,14 +33,15 @@ func main() {
 Assuming the file names are the SHA256 hash of the file, it calculates the SHA256 hash of each file and compares it with the file name.
 If the file name matches the hash, the file is intact; otherwise, it is corrupted.
 The tool can be used to check the integrity of files in a directory before deploying them to a server.`,
-		Run: func(cmd *cobra.Command, args []string) {
-			runChecker(cmd, refCheckOptions, args)
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runChecker(cmd, refCheckOptions, args)
 		},
 	}
 
 	goos := runtime.GOOS
 
 	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Paths, "path", "p", []string{"."}, "Path to the folder. Can be specified multiple times.")
+	rootCmd.Flags().StringSliceVarP(&refCheckOptions.PathsFile, "paths-file", "pf", []string{}, "Path to a file containing a list of folder paths. Each path should be on a new line.")
 	rootCmd.Flags().StringSliceVarP(&refCheckOptions.Exclude, "exclude", "e", []string{}, "Regular expression pattern for excluding files and folders. Can be specified multiple times.")
 	rootCmd.Flags().IntVarP(&refCheckOptions.Workers, "workers", "w", 4, "Number of workers for parallel processing")
 	rootCmd.Flags().BoolVarP(&refCheckOptions.JSON, "json", "j", false, "Print the results in JSON format")
@@ -58,10 +62,32 @@ func collectExcludePatterns(opts RefCheckOptions) *regexp.Regexp {
 	return regexp.MustCompile(combinedPattern)
 }
 
-func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
+func getFolderPaths(opts RefCheckOptions) ([]string, error) {
 	folderPaths := opts.Paths
+	for _, pf := range opts.PathsFile {
+		file, err := os.Open(pf)
+		if err != nil {
+			fmt.Printf("Error opening file: %v\n", err)
+			return nil, err
+		}
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			folderPaths = append(folderPaths, scanner.Text())
+		}
+	}
+	return folderPaths, nil
+}
+
+func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) error {
 	numWorkers := opts.Workers
 	jsonOutput := opts.JSON
+
+	folderPaths, err := getFolderPaths(opts)
+	if err != nil {
+		fmt.Printf("Error getting folder paths: %v\n", err)
+		return err
+	}
 
 	exclude := collectExcludePatterns(opts)
 
@@ -71,10 +97,11 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 		result, err := validator.ProcessFolder(folderPath, exclude, numWorkers)
 		if err != nil {
 			fmt.Printf("Error: %v\n", err)
-			return
+			return err
 		}
 		results[idx] = result
 	}
 
 	ui.PrintResult(results, jsonOutput, cmd.OutOrStdout())
+	return nil
 }
