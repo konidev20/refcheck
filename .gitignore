@@ -25,6 +25,6 @@ go.work.sum
 .env
 
 # ignore built binaries
-refcheck
+verifydata
 
 .vscode/

@@ -1,4 +1,4 @@
-module github.com/konidev20/refcheck
+module github.com/konidev20/verifydata
 
 go 1.22.0
 

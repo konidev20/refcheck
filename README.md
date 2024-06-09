@@ -1,6 +1,6 @@
-# refcheck
+# verifydata
 
-refcheck is a command-line tool written in Go that checks the integrity of files within a specified directory. It assumes that the file names are the SHA256 hashes of their contents. The tool calculates the SHA256 hash of each file and compares it with the file name to determine if the file is intact or corrupted.
+verifydata is a command-line tool written in Go that checks the integrity of files within a specified directory. It assumes that the file names are the SHA256 hashes of their contents. The tool calculates the SHA256 hash of each file and compares it with the file name to determine if the file is intact or corrupted.
 
 ## Features
 
@@ -10,23 +10,23 @@ refcheck is a command-line tool written in Go that checks the integrity of files
 
 ## Installation
 
-To install RefCheck, you need to have Go installed on your machine. Follow these steps:
+To install verifydata, you need to have Go installed on your machine. Follow these steps:
 
 1. Clone the repository:
 ```
-git clone https://github.com/konidev20/refcheck.git
+git clone https://github.com/konidev20/verifydata.git
 ```
 2. Navigate to the project directory:
 ```
-cd refcheck
+cd verifydata
 ```
 3. Build the binary:
 ```
-go build -o refcheck
+go build -o verifydata
 ```
 4. Move the binary to a location in your PATH:
 ```
-mv refcheck /usr/local/bin/refcheck
+mv verifydata /usr/local/bin/verifydata
 ```
 
 ## Flags
@@ -39,7 +39,7 @@ mv refcheck /usr/local/bin/refcheck
 ## Example 1 - Table Format
 
 ```
-refcheck -p . -e config -w 8
+verifydata -p . -e config -w 8
 ```
 
 ```
@@ -59,7 +59,7 @@ File Path                                  Expected Hash  Actual Hash
 ## Example 2 - JSON Format
 
 ```
-refcheck -p . -e config -w 8 -j
+verifydata -p . -e config -w 8 -j
 ```
 
 Output:
@@ -85,12 +85,12 @@ Output:
 ```
 
 ## Templates
-You can use templates to do refcheck for specific repsotitories. Currently, templates use exclusion
+You can use templates to do verifydata for specific repsotitories. Currently, templates use exclusion
 lists which are common to a specific repository format. For example, in restic repositories all files
 except the `config` file have a SHA256 hash of the file name.
 
 ```
-refcheck -p . -t restic -w 8 -j
+verifydata -p . -t restic -w 8 -j
 ```
 
 The above command will exclude the restic repository specifc exclusion list and check the files.

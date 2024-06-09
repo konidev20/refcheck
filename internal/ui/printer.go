@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/konidev20/refcheck/internal/validator"
+	"github.com/konidev20/verifydata/internal/validator"
 	"github.com/rodaine/table"
 )
 
