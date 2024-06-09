@@ -141,6 +141,10 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 		return
 	}
 
+	printResult(result, jsonOutput, cmd.OutOrStdout())
+}
+
+func printResult(result *Result, jsonOutput bool, w io.Writer) {
 	if jsonOutput {
 		jsonData, _ := json.MarshalIndent(result, "", "  ")
 		fmt.Println(string(jsonData))
@@ -148,7 +152,7 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 		tbl := table.New("Result", "Value")
 		tbl.WithHeaderSeparatorRow('-')
 		tbl.WithPadding(2)
-		tbl.WithWriter(cmd.OutOrStdout())
+		tbl.WithWriter(w)
 		tbl.AddRow("Total Files", result.TotalFiles)
 		tbl.AddRow("Intact Files", result.IntactFiles)
 		tbl.AddRow("Corrupted Files", result.CorruptedFiles)
@@ -158,7 +162,7 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 		if result.CorruptedFiles > 0 {
 			fmt.Println("\nCorrupted Files:")
 			tbl := table.New("File Path", "Expected Hash", "Actual Hash")
-			tbl.WithWriter(cmd.OutOrStdout())
+			tbl.WithWriter(w)
 			tbl.WithHeaderSeparatorRow('-')
 			tbl.WithPadding(2)
 			for _, file := range result.CorruptedFileList {
@@ -170,7 +174,7 @@ func runChecker(cmd *cobra.Command, opts RefCheckOptions, _ []string) {
 		if result.InvalidFiles > 0 {
 			fmt.Println("\nInvalid File Names:")
 			tbl := table.New("File Path")
-			tbl.WithWriter(cmd.OutOrStdout())
+			tbl.WithWriter(w)
 			tbl.WithHeaderSeparatorRow('-')
 			tbl.WithPadding(2)
 			for _, file := range result.InvalidFileList {
