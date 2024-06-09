@@ -1,10 +1,10 @@
-package main
+package template
 
 type Template struct {
 	Exclude []string
 }
 
-var templates map[string]Template
+var Templates map[string]Template
 
 var resticTemplate Template = Template{
 	Exclude: []string{"config"},
@@ -15,7 +15,7 @@ var macOSTemplate Template = Template{
 }
 
 func init() {
-	templates = map[string]Template{
+	Templates = map[string]Template{
 		"restic": resticTemplate,
 		"darwin": macOSTemplate,
 	}

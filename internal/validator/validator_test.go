@@ -1,4 +1,4 @@
-package main
+package validator
 
 import (
 	"os"
@@ -26,7 +26,7 @@ func TestIsValidSha256(t *testing.T) {
 	}
 }
 
-func TestProcessFile(t *testing.T) {
+func TestValidateFile(t *testing.T) {
 	// Setup
 
 	tmpDir := os.TempDir()
@@ -47,7 +47,7 @@ func TestProcessFile(t *testing.T) {
 
 	// Test valid file
 	t.Run("Valid File", func(t *testing.T) {
-		processFile(tempFile.Name(), result)
+		ValidateFile(tempFile.Name(), result)
 		if result.IntactFiles != 1 {
 			t.Errorf("Expected 1 intact file, got %d", result.IntactFiles)
 		}
@@ -57,7 +57,7 @@ func TestProcessFile(t *testing.T) {
 
 	// Test invalid file name
 	t.Run("Invalid File Name", func(t *testing.T) {
-		processFile("invalidfilename", result)
+		ValidateFile("invalidfilename", result)
 		if result.InvalidFiles != 1 {
 			t.Errorf("Expected 1 invalid file, got %d", result.InvalidFiles)
 		}
@@ -69,7 +69,7 @@ func TestProcessFile(t *testing.T) {
 
 	// Test corrupted file
 	t.Run("Corrupted File", func(t *testing.T) {
-		processFile(tempFile.Name(), result)
+		ValidateFile(tempFile.Name(), result)
 		if result.CorruptedFiles != 1 {
 			t.Errorf("Expected 1 corrupted file, got %d", result.CorruptedFiles)
 		}
